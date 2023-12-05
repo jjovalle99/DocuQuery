@@ -16,7 +16,7 @@ cache = false
 
 [features]
 # Show the prompt playground
-prompt_playground = true
+prompt_playground = false
 
 # Process and display HTML in messages. This can be a security risk (see https://stackoverflow.com/questions/19603097/why-is-it-dangerous-to-render-user-generated-html-or-javascript)
 unsafe_allow_html = false
@@ -25,7 +25,7 @@ unsafe_allow_html = false
 latex = false
 
 # Authorize users to upload files with messages
-multi_modal = true
+multi_modal = false
 
 # Allows user to use speech to text
 [features.speech_to_text]
@@ -35,7 +35,7 @@ multi_modal = true
 
 [UI]
 # Name of the app and chatbot.
-name = "Chatbot"
+name = "DocuQuery"
 
 # Show the readme while the conversation is empty.
 show_readme_as_default = true
