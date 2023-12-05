@@ -1,4 +1,8 @@
+import datetime
+
 import chainlit as cl
+import wandb
+from wandb.sdk.data_types.trace_tree import Trace
 
 from src.openai_utils.chatmodel import ChatOpenAI
 from src.raqa import RetrievalAugmentedQAPipeline
@@ -7,6 +11,7 @@ from src.vectordatabase import VectorDatabase
 
 vector_database = VectorDatabase()
 splitter = CharacterTextSplitter()
+wandb.init(project="DocuQuery")
 
 
 async def _populate_vector_database(files):
@@ -48,16 +53,50 @@ async def main(message: cl.Message):
     chat_openai = ChatOpenAI()
     vector_database = cl.user_session.get("vector_database")
 
-    retrieval_augmented_qa_pipeline = RetrievalAugmentedQAPipeline(
-        vector_db_retriever=vector_database, llm=chat_openai
+    try:
+        retrieval_augmented_qa_pipeline = RetrievalAugmentedQAPipeline(
+            vector_db_retriever=vector_database, llm=chat_openai
+        )
+        out = cl.Message(content="")
+
+        await out.send()
+        start_time = datetime.datetime.now().timestamp() * 1000
+
+        stream = await retrieval_augmented_qa_pipeline.run_pipeline(message.content)
+        async for chunk in stream:
+            if token := chunk.choices[0].delta.content or "":
+                await out.stream_token(token)
+
+        end_time = datetime.datetime.now().timestamp() * 1000
+        await out.update()
+
+        status = "success"
+        status_message = (None,)
+        response_text = out.content
+        model = chat_openai.model_name
+
+    except Exception as e:
+        end_time = datetime.datetime.now().timestamp() * 1000
+        status = "error"
+        status_message = str(e)
+        response_text = ""
+        model = ""
+
+    root_span = Trace(
+        name="DocuQuery",
+        kind="llm",
+        status_code=status,
+        status_message=status_message,
+        start_time_ms=start_time,
+        end_time_ms=end_time,
+        metadata={
+            "model": model,
+        },
+        inputs={
+            "system_prompt": retrieval_augmented_qa_pipeline.formatted_system_prompt,
+            "user_prompt": retrieval_augmented_qa_pipeline.formatted_user_prompt,
+        },
+        outputs={"response": response_text},
     )
 
-    out = cl.Message(content="")
-    await out.send()
-
-    stream = await retrieval_augmented_qa_pipeline.run_pipeline(message.content)
-    async for chunk in stream:
-        if token := chunk.choices[0].delta.content or "":
-            await out.stream_token(token)
-
-    await out.update()
+    root_span.log(name="docuquery_trace")

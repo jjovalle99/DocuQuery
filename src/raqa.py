@@ -27,6 +27,8 @@ class RetrievalAugmentedQAPipeline:
     def __init__(self, llm: ChatOpenAI(), vector_db_retriever: VectorDatabase) -> None:
         self.llm = llm
         self.vector_db_retriever = vector_db_retriever
+        self.formatted_system_prompt = None
+        self.formatted_user_prompt = None
 
     def run_pipeline(self, user_query: str) -> str:
         context_list = self.vector_db_retriever.search_by_text(user_query, k=4)
@@ -35,8 +37,9 @@ class RetrievalAugmentedQAPipeline:
         for context in context_list:
             context_prompt += context[0] + "\n"
 
-        formatted_system_prompt = raqa_prompt.create_message(context=context_prompt)
+        self.formatted_system_prompt = raqa_prompt.create_message(
+            context=context_prompt
+        )
+        self.formatted_user_prompt = user_prompt.create_message(user_query=user_query)
 
-        formatted_user_prompt = user_prompt.create_message(user_query=user_query)
-
-        return self.llm.run([formatted_system_prompt, formatted_user_prompt])
+        return self.llm.run([self.formatted_system_prompt, self.formatted_user_prompt])
